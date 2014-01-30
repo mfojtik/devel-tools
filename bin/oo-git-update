@@ -1,0 +1,84 @@
+#!/bin/env ruby
+#
+# Synchronize all GIT repositories in folder so the
+# local master is sync with upstream/master.
+#
+# Dependencies: gem install ruby-progressbar
+#
+# * It will ask for stash if local modifications
+# * It skip repo if there is no 'upstream' remote
+#
+# To make this script work your repo needs to have upstream remote:
+#
+# $ ...fork something....
+# $ git clone git@github.com:mfojtik/forked_repo.git
+# $ git add remote upstream <original git repo>
+#
+
+require 'rubygems'
+require 'ruby-progressbar'
+
+# Path to the GIT repositories folder
+#
+REPOSITORIES_FOLDER = File.join(ENV['HOME'], 'code', 'rh')
+
+def accept?(question)
+  print "#{question.strip} (Y/n/a):"
+  begin
+    answer = $stdin.gets.chomp
+    case answer
+      when /(Y|y|yes)/ then true
+      when /(N|n|no)/ then false
+      when /(A|a|abort)/ then exit(1)
+      else raise 'ERROR: Please answer "y" (yes) or "n" (no) or "a" (abort).'
+    end
+  rescue => e
+    puts e.message && retry
+  end
+end
+
+def stash_repo(repo_dir)
+  Dir.chdir(repo_dir) do
+    result = %x[git stash 2>/dev/null]
+    if $?.to_i == 0
+      repo_dir
+    else
+      puts "ERROR: #{result}"
+      accept?("Skip repository #{File.basename(repo_dir)}") ? nil : exit(1)
+    end
+  end
+end
+
+def has_upstream?(repo_dir)
+  Dir.chdir(repo_dir) { %x[git remote].split("\n").include?("upstream") }
+end
+
+update_repos = []
+
+Dir[File.join(REPOSITORIES_FOLDER, '*')].reject { |f| !File.directory?(f) }.each do |repo|
+  Dir.chdir(repo) do
+    repo_name = File.basename(repo)
+    next unless has_upstream?(repo)
+    %x[git checkout master 2>/dev/null]
+    (update_repos << repo) && next if $?.to_i == 0
+    stash_repo(repo) if accept?("Stash local changes in '#{repo_name}'")
+  end
+end
+
+update_repos.sort!
+
+progressbar = ProgressBar.create(total: update_repos.count * 3)
+
+update_repos.each do |repo|
+  progressbar.title = "#{File.basename(repo)}.git"
+  Dir.chdir(repo) do
+    %x[git fetch upstream 2>/dev/null]
+    progressbar.increment
+    %x[git merge upstream/master 2>/dev/null]
+    progressbar.increment
+    %x[git push origin master 2>/dev/null]
+    progressbar.increment
+  end
+end
+
+progressbar.finish
