@@ -23,8 +23,8 @@ require 'ruby-progressbar'
 REPOSITORIES_FOLDER = File.join(ENV['HOME'], 'code', 'rh')
 
 def accept?(question)
-  print "#{question.strip} (Y/n/a):"
   begin
+    print "#{question.strip} (Y/n/a):"
     answer = $stdin.gets.chomp
     case answer
       when /(Y|y|yes)/ then true

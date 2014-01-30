@@ -1,0 +1,74 @@
+#!/bin/env ruby
+
+require 'rubygems'
+require 'ruby-progressbar'
+
+REPOSITORIES_FOLDER = File.join(ENV['HOME'], 'code', 'rh')
+REPO_FOLDER = File.join(REPOSITORIES_FOLDER, ARGV[0])
+
+def accept?(question)
+  begin
+    print "#{question.strip} (Y/n/a):"
+    answer = $stdin.gets.chomp
+    case answer
+      when /(Y|y|yes)/ then true
+      when /(N|n|no)/ then false
+      when /(A|a|abort)/ then exit(1)
+      else raise 'ERROR: Please answer "y" (yes) or "n" (no) or "a" (abort).'
+    end
+  rescue => e
+    puts e.message && retry
+  end
+end
+
+unless File.directory?(REPO_FOLDER)
+  puts "ERROR: Unknown repository: #{REPO_FOLDER}"
+  exit(1)
+end
+
+remove_branches = []
+
+%x[git fetch upstream 2>/dev/null]
+
+Dir.chdir(REPO_FOLDER) do
+  %x[git checkout master 2>/dev/null]
+  branches = %x[git branch].split("\n")
+  progressbar = ProgressBar.create(total: branches.count, title: "Analyzing #{branches.count} branches")
+  branches.each do |branch|
+    branch.strip!
+    next if branch =~ /master$/
+    %x[git checkout #{branch} 2>/dev/null]
+    remove_branches << branch if %x[git cherry upstream/master].split("\n").count == 0
+    progressbar.increment
+  end
+  progressbar.finish
+end
+
+if remove_branches.count == 0
+  puts "Everything looks clean :-)"
+  exit(0)
+end
+
+puts "\nAlready pushed to #{File.basename(REPO_FOLDER)}#upstream/master:"
+puts
+puts remove_branches.join(", ")
+puts
+
+exit(0) unless accept?("Remove #{remove_branches.count} branches?")
+
+Dir.chdir(REPO_FOLDER) do
+  %x[git checkout master 2>/dev/null]
+  begin
+    progressbar = ProgressBar.create(total: remove_branches.count * 2)
+    remove_branches.each do |branch|
+      progressbar.title = branch
+      %x[git branch -D #{branch}]
+      progressbar.increment
+      %x[git push origin :#{branch} 2>/dev/null]
+      progressbar.increment
+    end
+    progressbar.finish
+  ensure
+    %x[git checkout master 2>/dev/null]
+  end
+end
