@@ -55,7 +55,10 @@ end
 
 update_repos = []
 
-Dir[File.join(REPOSITORIES_FOLDER, '*')].reject { |f| !File.directory?(f) }.each do |repo|
+repos_to_update = ARGV[0] || '*'
+repos_to_update = File.basename(Dir.pwd) if repos_to_update == '.'
+
+Dir[File.join(REPOSITORIES_FOLDER, repos_to_update)].reject { |f| !File.directory?(f) }.each do |repo|
   Dir.chdir(repo) do
     repo_name = File.basename(repo)
     next unless has_upstream?(repo)
