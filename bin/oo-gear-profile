@@ -1,0 +1,48 @@
+#!/bin/env ruby
+#!/usr/bin/env oo-ruby
+
+require 'time'
+
+GEAR_ID = ARGV[0]
+PLATFORM_LOG = ARGV[1] || '/var/log/openshift/node/platform.log'
+
+def tail_platform_log
+  File.read(PLATFORM_LOG).each_line { |l|
+    if parsed_line = l.scan(/^(\w+ \d{1,2} [\d:]+) (.*)$/).first
+      next unless parsed_line[1].include?(GEAR_ID)
+      yield Time.parse(parsed_line[0]), parsed_line[1].strip
+    end
+  }
+end
+
+previous_timestamp = false
+previous_message = false
+
+tail_platform_log do |timestamp, entry|
+
+  action = case entry
+  when /(\w+) against '(\w+)'/ then [$1, $2]
+  when /Creating cartridge directory \w{24}\/(\w+)$/ then ["create-dir", $1]
+  when /Created cartridge directory \w{24}\/(\w+)$/ then ["create-dir-complete", $1]
+  when /Creating \d+ (\w+) endpoints for \w{24}\/(\w+)$/ then ["create-#{$1}-endpoint", $2]
+  when /Created (\w+) endpoint for cart (\w+) in gear/ then ["create-#{$1}-endpoint-complete", $2]
+  when /Running (\w+) for \w{24}\/(\w+)$/ then [$1, $2]
+  when /Creating gear repo for \w{24}\/(\w+) from/ then ["create-repo", $1]
+  when /Connecting frontend mapping for \w{24}\/(\w+):/ then ["connect-frontend-mappings", $1]
+  when /\/usr\/bin\/rsync -av --delete .*\/(\w+)\/\\"/ then ["create-deployment-#{$1}", 'repo']
+  end
+
+  next unless action
+
+  if previous_timestamp
+    time_delta = "#{timestamp.to_i-previous_timestamp.to_i}s"
+  end
+
+  if previous_message
+    #puts "#{time_delta}: #{previous_message}"
+    puts "%6s [%s] -> %s" % [time_delta, action[1], action[0]]
+  end
+
+  previous_timestamp, previous_message = timestamp, action
+
+end
