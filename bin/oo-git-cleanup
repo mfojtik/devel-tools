@@ -14,7 +14,7 @@ def accept?(question)
       when /(Y|y|yes)/ then true
       when /(N|n|no)/ then false
       when /(A|a|abort)/ then exit(1)
-      else raise 'ERROR: Please answer "y" (yes) or "n" (no) or "a" (abort).'
+      else fail 'ERROR: Please answer "y" (yes) or "n" (no) or "a" (abort).'
     end
   rescue => e
     puts e.message && retry
