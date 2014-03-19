@@ -76,10 +76,12 @@ update_repos.each do |repo|
   progressbar.title = "#{File.basename(repo)}.git"
   Dir.chdir(repo) do
     %x[git fetch upstream 2>/dev/null]
+    %x[git fetch upstream --tags 2>/dev/null]
     progressbar.increment
     %x[git merge upstream/master 2>/dev/null]
     progressbar.increment
     %x[git push origin master 2>/dev/null]
+    %x[git push --tags 2>/dev/null]
     progressbar.increment
   end
 end
