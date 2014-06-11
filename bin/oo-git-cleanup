@@ -2,9 +2,10 @@
 
 require 'rubygems'
 require 'ruby-progressbar'
+require 'fileutils'
 
 REPOSITORIES_FOLDER = File.join(ENV['HOME'], 'code', 'rh')
-REPO_FOLDER = File.join(REPOSITORIES_FOLDER, ARGV[0])
+REPO_FOLDER = (ARGV[0] == '.') ? FileUtils.pwd : File.join(REPOSITORIES_FOLDER, ARGV[0])
 
 def accept?(question)
   begin
